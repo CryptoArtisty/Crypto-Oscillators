@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Crypto Chart Tester with Alerts</title>
+  <script src="https://unpkg.com/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 10px;
+      font-family: Arial;
+      font-size: 14px;
+    }
+    #chart-container {
+      width: 100%;
+      height: 50vh;
+      min-height: 300px;
+      position: relative;
+    }
+    #stochastic-container {
+      width: 100%;
+      height: 20vh;
+      min-height: 150px;
+    }
+    #timeframe-selector {
+      margin: 10px 0;
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+    #indicator-controls {
+      margin: 10px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    #setup-checklist {
+      margin: 10px 0;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      background: #f9f9f9;
+      font-size: 0.9em;
+    }
+    #alerts-container {
+      margin: 10px 0;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      background: #f9f9f9;
+      max-height: 150px;
+      overflow-y: auto;
+      font-size: 0.9em;
+    }
+    .alert {
+      padding: 5px;
+      margin: 3px 0;
+      border-radius: 3px;
+    }
+    .alert.bullish {
+      background: rgba(0, 200, 5, 0.1);
+      border-left: 3px solid #00C805;
+    }
+    .alert.bearish {
+      background: rgba(200, 0, 0, 0.1);
+      border-left: 3px solid #C80000;
+    }
+    .alert.info {
+      background: rgba(0, 0, 255, 0.1);
+      border-left: 3px solid #0000FF;
+    }
+    .control-group {
+      border: 1px solid #ddd;
+      padding: 5px;
+      border-radius: 5px;
+      background: #f9f9f9;
+      font-size: 0.9em;
+    }
+    .timeframe-btn, .toggle-btn, #restore-chart-btn {
+      padding: 5px 10px;
+      cursor: pointer;
+      border: 1px solid #ddd;
+      background: white;
+      border-radius: 3px;
+      font-size: 0.9em;
+      white-space: nowrap;
+    }
+    .timeframe-btn.active, .toggle-btn.active {
+      background: #ff9800;
+      font-weight: bold;
+      border-color: #e68a00;
+    }
+    .stochastic-option {
+      display: inline-block;
+      margin-right: 10px;
+      white-space: nowrap;
+    }
+    .stochastic-legend {
+      position: absolute;
+      right: 20px;
+      top: 10px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 5px;
+      border-radius: 3px;
+      font-size: 12px;
+      border: 1px solid #eee;
+      z-index: 100;
+    }
+    .stochastic-legend-item {
+      display: flex;
+      align-items: center;
+      margin: 2px 0;
+    }
+    .stochastic-legend-color {
+      width: 12px;
+      height: 12px;
+      margin-right: 5px;
+      display: inline-block;
+    }
+    #restore-chart-btn {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 100;
+      background: rgba(255, 255, 255, 0.9);
+    }
+    .checklist-item {
+      margin: 5px 0;
+      display: flex;
+      align-items: center;
+    }
+    .checklist-item input {
+      margin-right: 8px;
+    }
+    .checklist-item.checked {
+      color: #00C805;
+    }
+    .setup-title {
+      font-weight: bold;
+      margin: 10px 0 5px 0;
+      padding-bottom: 3px;
+      border-bottom: 1px solid #eee;
+    }
+    #toggle-k-lines-btn {
+      margin-left: 10px;
+    }
+    .new-setup {
+      background: rgba(0, 0, 255, 0.1);
+      padding: 10px;
+      border-radius: 5px;
+      margin-top: 10px;
+    }
+    #crypto-selector {
+      margin: 10px 0;
+      padding: 5px 10px;
+      border-radius: 3px;
+      border: 1px solid #ddd;
+      font-size: 0.9em;
+    }
+    @media (max-width: 600px) {
+      body {
+        padding: 5px;
+        font-size: 12px;
+      }
+      #timeframe-selector {
+        gap: 3px;
+      }
+      #indicator-controls {
+        gap: 5px;
+      }
+      .control-group {
+        padding: 3px;
+      }
+      .timeframe-btn, .toggle-btn, #restore-chart-btn {
+        padding: 3px 6px;
+        font-size: 0.8em;
+      }
+      .stochastic-option {
+        margin-right: 5px;
+        font-size: 0.8em;
+      }
+      #setup-checklist, #alerts-container {
+        padding: 5px;
+        font-size: 0.8em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h2>Crypto Chart Tester with Alerts</h2>
+  
+  <div>
+    <select id="crypto-selector">
+      <option value="BTCUSDT">Bitcoin (BTC/USDT)</option>
+      <option value="ETHUSDT">Ethereum (ETH/USDT)</option>
+      <option value="SOLUSDT">Solana (SOL/USDT)</option>
+      <option value="BNBUSDT">Binance Coin (BNB/USDT)</option>
+      <option value="ADAUSDT">Cardano (ADA/USDT)</option>
+      <option value="XRPUSDT">XRP (XRP/USDT)</option>
+      <option value="LINKUSDT">Chainlink (LINK/USDT)</option>
+      <option value="UNIUSDT">Uniswap (UNI/USDT)</option>
+    </select>
+  </div>
+  
+  <div id="timeframe-selector">
+    <button class="timeframe-btn" data-tf="1d">Daily</button>
+    <button class="timeframe-btn" data-tf="4h">4H</button>
+    <button class="timeframe-btn active" data-tf="1h">1H</button>
+    <button class="timeframe-btn" data-tf="15m">15M</button>
+    <button class="timeframe-btn" data-tf="5m">5M</button>
+    <button class="timeframe-btn" data-tf="1m">1M</button>
+  </div>
+  
+  <div id="indicator-controls">
+    <div class="control-group">
+      <strong>Stochastic:</strong>
+      <div class="stochastic-option">
+        <input type="checkbox" id="stoch-fast-9-3" checked> <label for="stoch-fast-9-3">Fast (9,3)</label>
+      </div>
+      <div class="stochastic-option">
+        <input type="checkbox" id="stoch-fast-14-3" checked> <label for="stoch-fast-14-3">Medium (14,3)</label>
+      </div>
+      <div class="stochastic-option">
+        <input type="checkbox" id="stoch-fast-40-4" checked> <label for="stoch-fast-40-4">Slow (40,4)</label>
+      </div>
+      <div class="stochastic-option">
+        <input type="checkbox" id="stoch-full-60-10-10" checked> <label for="stoch-full-60-10-10">Full (60,10,10)</label>
+      </div>
+    </div>
+    
+    <div class="control-group">
+      <strong>EMA:</strong>
+      <button class="toggle-btn active" data-ema="20">20 EMA</button>
+      <button class="toggle-btn" data-ema="50">50 EMA</button>
+      <button class="toggle-btn" data-ema="100">100 EMA</button>
+      <button class="toggle-btn" data-ema="200">200 EMA</button>
+    </div>
+  </div>
+  
+  <div id="chart-container">
+    <button id="restore-chart-btn">Restore Chart</button>
+  </div>
+  <div id="stochastic-container"></div>
+  <div id="stochastic-legend" class="stochastic-legend"></div>
+
+  <div id="setup-checklist">
+    <div class="setup-title">Bull Flag Buy Setup</div>
+    <div class="checklist-item" id="bull-condition-1">
+      <input type="checkbox" disabled> Slow stochastic (40,4) is holding above 80
+    </div>
+    <div class="checklist-item" id="bull-condition-2">
+      <input type="checkbox" disabled> Medium stochastic (14,3) is holding above 80
+    </div>
+    <div class="checklist-item" id="bull-condition-3">
+      <input type="checkbox" disabled> Fast stochastic (9,3) rotates quickly back down to 20
+    </div>
+    <div class="checklist-item" id="bull-condition-4">
+      <input type="checkbox" disabled> Price is holding on or above the 20 EMA
+    </div>
+    <div class="checklist-item" id="bull-condition-5">
+      <input type="checkbox" disabled> Fast stochastic touches oversold 20 line
+    </div>
+    
+    <div class="setup-title">Bear Flag Short Setup</div>
+    <div class="checklist-item" id="bear-condition-1">
+      <input type="checkbox" disabled> Slow stochastic (40,4) is holding under 20
+    </div>
+    <div class="checklist-item" id="bear-condition-2">
+      <input type="checkbox" disabled> Medium stochastic (14,3) is holding under 20
+    </div>
+    <div class="checklist-item" id="bear-condition-3">
+      <input type="checkbox" disabled> Fast stochastic (9,3) rotates quickly back up to 80
+    </div>
+    <div class="checklist-item" id="bear-condition-4">
+      <input type="checkbox" disabled> Price is holding on or below the 20 EMA
+    </div>
+    <div class="checklist-item" id="bear-condition-5">
+      <input type="checkbox" disabled> Fast stochastic touches overbought 80 line
+    </div>
+    
+    <div class="new-setup">
+      <div class="setup-title">Pullback Buy Setup</div>
+      <div class="checklist-item" id="pullback-condition-1">
+        <input type="checkbox" disabled> Price has pullback in an organized fashion (typically inside a channel)
+      </div>
+      <div class="checklist-item" id="pullback-condition-2">
+        <input type="checkbox" disabled> All 4 Stochastic Bands drop under the 20 line on first stage
+      </div>
+      <div class="checklist-item" id="pullback-condition-3">
+        <input type="checkbox" disabled> Price bounces with 9-3 Stochastic Band, then trades lower than first stage price
+      </div>
+      <div class="checklist-item" id="pullback-condition-4">
+        <input type="checkbox" disabled> As price drops equal/lower than 1st stage, 9-3 stochastic turns up above 20 line
+      </div>
+      <div class="checklist-item" id="pullback-condition-5">
+        <input type="checkbox" disabled> 9-3 stochastic low is higher than the 1st stage stochastic low (bullish divergence)
+      </div>
+    </div>
+  </div>
+
+  <div id="alerts-container">
+    <div class="alert info">[<span id="initial-timestamp"></span>] Chart initialized. Waiting for signals... Alerts will appear here...</div>
+  </div>
+
+  <script>
+    let chart;
+    let stochasticChart;
+    let candleSeries;
+    let currentTimeframe = '1h';
+    let currentSymbol = 'BTCUSDT';
+    let updateInterval;
+    let isSyncingCharts = false;
+    let lastAlertTime = 0;
+    
+    // Store initial time scale state
+    let initialTimeScale = {
+      rightOffset: 0,
+      barSpacing: 6,
+      fixLeftEdge: false,
+      fixRightEdge: true,
+      lockVisibleTimeRangeOnResize: true
+    };
+    
+    // Stochastic series
+    let stochSeries = {
+      'fast-9-3-d': null,
+      'fast-14-3-d': null,
+      'fast-40-4-d': null,
+      'full-60-10-10-d': null
+    };
+    
+    // EMA series
+    let emaSeries = {
+      '20': null,
+      '50': null,
+      '100': null,
+      '200': null
+    };
+    
+    // Current candle data
+    let currentCandles = [];
+    let currentStochastics = {
+      fast: [],
+      medium: [],
+      slow: [],
+      full: []
+    };
+    
+    // Stochastic state tracking for pullback setup
+    let stochState = {
+      firstStage: false,
+      firstStageLow: null,
+      firstStageStochLow: null,
+      secondStage: false
+    };
+    
+    // Stochastic colors and labels
+    const stochColors = {
+      'fast-9-3-d': { color: '#FF0000', label: 'Fast %D (9,3)' }, // Red
+      'fast-14-3-d': { color: '#00AA00', label: 'Medium %D (14,3)' }, // Green
+      'fast-40-4-d': { color: '#0000FF', label: 'Slow %D (40,4)' }, // Blue
+      'full-60-10-10-d': { color: '#888888', label: 'Full %D (60,10,10)' } // Gray (changed from white)
+    };
+
+    function initChart() {
+      const container = document.getElementById('chart-container');
+      const stochasticContainer = document.getElementById('stochastic-container');
+
+      container.innerHTML = '<button id="restore-chart-btn">Restore Chart</button>';
+      stochasticContainer.innerHTML = '';
+
+      chart = LightweightCharts.createChart(container, {
+        layout: {
+          backgroundColor: '#ffffff',
+          textColor: '#333',
+        },
+        grid: {
+          vertLines: { color: '#eee' },
+          horzLines: { color: '#eee' },
+        },
+        width: container.clientWidth,
+        height: container.clientHeight,
+        timeScale: initialTimeScale
+      });
+
+      stochasticChart = LightweightCharts.createChart(stochasticContainer, {
+        layout: {
+          backgroundColor: '#000000',
+          textColor: '#fff',
+        },
+        grid: {
+          vertLines: { color: '#333' },
+          horzLines: { color: '#333' },
+        },
+        width: stochasticContainer.clientWidth,
+        height: stochasticContainer.clientHeight,
+        rightPriceScale: {
+          scaleMargins: {
+            top: 0.2,
+            bottom: 0.2,
+          },
+        },
+        timeScale: initialTimeScale
+      });
+
+      candleSeries = chart.addCandlestickSeries();
+      
+      // Initialize all stochastic series (without titles to reduce clutter)
+      Object.keys(stochSeries).forEach(key => {
+        stochSeries[key] = stochasticChart.addLineSeries({
+          color: stochColors[key].color,
+          lineWidth: 1,
+          title: '', // Empty title to remove label from price scale
+          visible: true
+        });
+      });
+
+      // Horizontal reference lines
+      stochasticChart.addLineSeries({
+        color: 'rgba(255, 255, 255, 0.5)',
+        lineWidth: 1,
+        lineStyle: 2
+      }).setData([
+        { time: Math.floor(Date.now() / 1000), value: 80 },
+        { time: Math.floor(Date.now() / 1000) + 60 * 60, value: 80 },
+      ]);
+
+      stochasticChart.addLineSeries({
+        color: 'rgba(255, 255, 255, 0.5)',
+        lineWidth: 1,
+        lineStyle: 2
+      }).setData([
+        { time: Math.floor(Date.now() / 1000), value: 20 },
+        { time: Math.floor(Date.now() / 1000) + 60 * 60, value: 20 },
+      ]);
+
+      // Synchronize time scales
+      setupChartSync();
+      
+      loadData(currentTimeframe);
+      setupAutoUpdate(currentTimeframe);
+      updateStochasticLegend();
+      
+      // Set up event listeners for indicator toggles
+      setupIndicatorControls();
+      
+      // Set up restore chart button
+      document.getElementById('restore-chart-btn').addEventListener('click', restoreChart);
+      
+      // Set initial timestamp
+      document.getElementById('initial-timestamp').textContent = new Date().toLocaleTimeString();
+    }
+    
+    function setupChartSync() {
+      // Sync main chart to stochastic chart
+      chart.timeScale().subscribeVisibleLogicalRangeChange((newRange) => {
+        if (newRange && !isSyncingCharts) {
+          isSyncingCharts = true;
+          stochasticChart.timeScale().setVisibleLogicalRange(newRange);
+          isSyncingCharts = false;
+        }
+      });
+      
+      // Sync stochastic chart to main chart
+      stochasticChart.timeScale().subscribeVisibleLogicalRangeChange((newRange) => {
+        if (newRange && !isSyncingCharts) {
+          isSyncingCharts = true;
+          chart.timeScale().setVisibleLogicalRange(newRange);
+          isSyncingCharts = false;
+        }
+      });
+    }
+    
+    function restoreChart() {
+      // Reset time scale to initial state
+      chart.timeScale().applyOptions(initialTimeScale);
+      stochasticChart.timeScale().applyOptions(initialTimeScale);
+      
+      // Auto-fit the content
+      chart.timeScale().fitContent();
+      stochasticChart.timeScale().fitContent();
+    }
+    
+    function updateStochasticLegend() {
+      const legend = document.getElementById('stochastic-legend');
+      legend.innerHTML = '';
+      
+      Object.keys(stochSeries).forEach(key => {
+        if (stochSeries[key].options().visible) {
+          const item = document.createElement('div');
+          item.className = 'stochastic-legend-item';
+          item.innerHTML = `
+            <span class="stochastic-legend-color" style="background:${stochColors[key].color}"></span>
+            <span>${stochColors[key].label}</span>
+          `;
+          legend.appendChild(item);
+        }
+      });
+    }
+
+    function calculateStochastic(candles, kPeriod = 14, dPeriod = 3, smoothK = 1) {
+      const result = [];
+      const kValues = [];
+      const smoothedKValues = [];
+
+      // First pass: calculate raw %K values
+      for (let i = 0; i < candles.length; i++) {
+        if (i < kPeriod - 1) {
+          result.push({ time: candles[i].time, k: null, d: null });
+          continue;
+        }
+
+        let low = Infinity;
+        let high = -Infinity;
+
+        for (let j = i - kPeriod + 1; j <= i; j++) {
+          low = Math.min(low, candles[j].low);
+          high = Math.max(high, candles[j].high);
+        }
+
+        const currentClose = candles[i].close;
+        const k = ((currentClose - low) / (high - low)) * 100;
+        kValues.push(k);
+        
+        // Smooth %K if needed
+        let smoothedK = k;
+        if (smoothK > 1) {
+          if (kValues.length >= smoothK) {
+            const kSlice = kValues.slice(-smoothK);
+            smoothedK = kSlice.reduce((sum, val) => sum + val, 0) / smoothK;
+          } else {
+            smoothedK = null;
+          }
+        }
+        
+        smoothedKValues.push(smoothedK);
+
+        let d = null;
+        if (smoothedKValues.length >= dPeriod) {
+          const dSlice = smoothedKValues.slice(-dPeriod);
+          d = dSlice.reduce((sum, val) => sum + val, 0) / dPeriod;
+        }
+
+        result.push({
+          time: candles[i].time,
+          k: smoothedK,
+          d: d,
+        });
+      }
+
+      return result;
+    }
+    
+    function calculateEMA(data, period, priceKey = 'close') {
+      const k = 2 / (period + 1);
+      const ema = [];
+      
+      // Simple moving average for first value
+      let sum = 0;
+      for (let i = 0; i < period; i++) {
+        sum += data[i][priceKey];
+        ema.push({ time: data[i].time, value: null });
+      }
+      
+      ema[period-1] = { time: data[period-1].time, value: sum / period };
+      
+      // EMA for subsequent values
+      for (let i = period; i < data.length; i++) {
+        const value = data[i][priceKey] * k + ema[i-1].value * (1 - k);
+        ema.push({ time: data[i].time, value: value });
+      }
+      
+      return ema;
+    }
+    
+    function addAlert(message, type) {
+      const now = Date.now();
+      // Prevent duplicate alerts within 5 minutes
+      if (now - lastAlertTime < 300000 && type !== 'info') return;
+      
+      lastAlertTime = now;
+      
+      const alertsContainer = document.getElementById('alerts-container');
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `alert ${type}`;
+      
+      const dateStr = new Date().toLocaleTimeString();
+      alertDiv.textContent = `[${dateStr}] ${message}`;
+      
+      alertsContainer.insertBefore(alertDiv, alertsContainer.firstChild);
+      
+      // Keep only the last 20 alerts
+      while (alertsContainer.children.length > 20) {
+        alertsContainer.removeChild(alertsContainer.lastChild);
+      }
+    }
+    
+    function checkPullbackSetup() {
+      if (currentStochastics.fast.length < 20 || currentStochastics.full.length < 20) return;
+      
+      const latestFast = currentStochastics.fast[currentStochastics.fast.length - 1];
+      const prevFast = currentStochastics.fast[currentStochastics.fast.length - 2];
+      const latestPrice = currentCandles[currentCandles.length - 1].close;
+      
+      // Reset pullback conditions
+      document.querySelectorAll('#pullback-condition-1 input, #pullback-condition-2 input, #pullback-condition-3 input, #pullback-condition-4 input, #pullback-condition-5 input').forEach(cb => {
+        cb.checked = false;
+        cb.parentElement.classList.remove('checked');
+      });
+      
+      // Check for first stage (all stochastics under 20)
+      const allUnder20 = 
+        latestFast.d < 20 && 
+        currentStochastics.medium[currentStochastics.medium.length - 1].d < 20 && 
+        currentStochastics.slow[currentStochastics.slow.length - 1].d < 20 && 
+        currentStochastics.full[currentStochastics.full.length - 1].d < 20;
+      
+      if (allUnder20 && !stochState.firstStage) {
+        stochState.firstStage = true;
+        stochState.firstStageLow = latestPrice;
+        stochState.firstStageStochLow = latestFast.d;
+        stochState.secondStage = false;
+        
+        document.getElementById('pullback-condition-1').querySelector('input').checked = true;
+        document.getElementById('pullback-condition-1').classList.add('checked');
+        document.getElementById('pullback-condition-2').querySelector('input').checked = true;
+        document.getElementById('pullback-condition-2').classList.add('checked');
+      }
+      
+      // Check for second stage conditions
+      if (stochState.firstStage) {
+        // Price bounced and now trading lower than first stage
+        if (latestPrice <= stochState.firstStageLow && prevFast.d < 20 && latestFast.d > 20) {
+          stochState.secondStage = true;
+          
+          document.getElementById('pullback-condition-3').querySelector('input').checked = true;
+          document.getElementById('pullback-condition-3').classList.add('checked');
+          document.getElementById('pullback-condition-4').querySelector('input').checked = true;
+          document.getElementById('pullback-condition-4').classList.add('checked');
+          
+          // Check for bullish divergence (higher low in stochastic)
+          if (latestFast.d > stochState.firstStageStochLow) {
+            document.getElementById('pullback-condition-5').querySelector('input').checked = true;
+            document.getElementById('pullback-condition-5').classList.add('checked');
+            
+            addAlert("PULLBACK BUY SIGNAL: Bullish divergence with all conditions met", "bullish");
+            stochState.firstStage = false;
+            stochState.secondStage = false;
+          }
+        }
+      }
+    }
+    
+    function checkSetupConditions() {
+      if (currentCandles.length < 50 || 
+          currentStochastics.fast.length < 2 || 
+          currentStochastics.medium.length < 2 || 
+          currentStochastics.slow.length < 2) {
+        return;
+      }
+      
+      const latestCandle = currentCandles[currentCandles.length - 1];
+      const prevCandle = currentCandles[currentCandles.length - 2];
+      
+      const fastK = currentStochastics.fast[currentStochastics.fast.length - 1].k;
+      const fastKPrev = currentStochastics.fast[currentStochastics.fast.length - 2].k;
+      const fastD = currentStochastics.fast[currentStochastics.fast.length - 1].d;
+      const fastDPrev = currentStochastics.fast[currentStochastics.fast.length - 2].d;
+      
+      const mediumK = currentStochastics.medium[currentStochastics.medium.length - 1].k;
+      const mediumKPrev = currentStochastics.medium[currentStochastics.medium.length - 2].k;
+      
+      const slowK = currentStochastics.slow[currentStochastics.slow.length - 1].k;
+      const slowKPrev = currentStochastics.slow[currentStochastics.slow.length - 2].k;
+      
+      const ema20 = emaSeries['20'] ? emaSeries['20'].dataByIndex(currentCandles.length - 1, -1).value : null;
+      
+      // Reset all checkboxes
+      document.querySelectorAll('#setup-checklist input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+        cb.parentElement.classList.remove('checked');
+      });
+      
+      // Check Bull Flag conditions
+      const bullCondition1 = slowK > 80 && slowKPrev > 80;
+      const bullCondition2 = mediumK > 80 && mediumKPrev > 80;
+      const bullCondition3 = fastK < 30 && fastKPrev > 50; // Fast dropping to oversold
+      const bullCondition4 = ema20 && latestCandle.close >= ema20;
+      const bullCondition5 = fastK <= 25; // Touching oversold
+      
+      if (bullCondition1) {
+        document.getElementById('bull-condition-1').querySelector('input').checked = true;
+        document.getElementById('bull-condition-1').classList.add('checked');
+      }
+      if (bullCondition2) {
+        document.getElementById('bull-condition-2').querySelector('input').checked = true;
+        document.getElementById('bull-condition-2').classList.add('checked');
+      }
+      if (bullCondition3) {
+        document.getElementById('bull-condition-3').querySelector('input').checked = true;
+        document.getElementById('bull-condition-3').classList.add('checked');
+      }
+      if (bullCondition4) {
+        document.getElementById('bull-condition-4').querySelector('input').checked = true;
+        document.getElementById('bull-condition-4').classList.add('checked');
+      }
+      if (bullCondition5) {
+        document.getElementById('bull-condition-5').querySelector('input').checked = true;
+        document.getElementById('bull-condition-5').classList.add('checked');
+      }
+      
+      // Check Bear Flag conditions
+      const bearCondition1 = slowK < 20 && slowKPrev < 20;
+      const bearCondition2 = mediumK < 20 && mediumKPrev < 20;
+      const bearCondition3 = fastK > 70 && fastKPrev < 50; // Fast rising to overbought
+      const bearCondition4 = ema20 && latestCandle.close <= ema20;
+      const bearCondition5 = fastK >= 75; // Touching overbought
+      
+      if (bearCondition1) {
+        document.getElementById('bear-condition-1').querySelector('input').checked = true;
+        document.getElementById('bear-condition-1').classList.add('checked');
+      }
+      if (bearCondition2) {
+        document.getElementById('bear-condition-2').querySelector('input').checked = true;
+        document.getElementById('bear-condition-2').classList.add('checked');
+      }
+      if (bearCondition3) {
+        document.getElementById('bear-condition-3').querySelector('input').checked = true;
+        document.getElementById('bear-condition-3').classList.add('checked');
+      }
+      if (bearCondition4) {
+        document.getElementById('bear-condition-4').querySelector('input').checked = true;
+        document.getElementById('bear-condition-4').classList.add('checked');
+      }
+      if (bearCondition5) {
+        document.getElementById('bear-condition-5').querySelector('input').checked = true;
+        document.getElementById('bear-condition-5').classList.add('checked');
+      }
+      
+      // Generate alerts
+      if (bullCondition1 && bullCondition2 && bullCondition3 && bullCondition4) {
+        if (bullCondition5) {
+          addAlert("STRONG BULLISH SIGNAL: Fast stochastic touched oversold with all conditions met", "bullish");
+        } else if (fastK < 40) {
+          addAlert("Potential Bull Flag forming - watch for fast stochastic to approach 20", "bullish");
+        }
+      }
+      
+      if (bearCondition1 && bearCondition2 && bearCondition3 && bearCondition4) {
+        if (bearCondition5) {
+          addAlert("STRONG BEARISH SIGNAL: Fast stochastic touched overbought with all conditions met", "bearish");
+        } else if (fastK > 60) {
+          addAlert("Potential Bear Flag forming - watch for fast stochastic to approach 80", "bearish");
+        }
+      }
+      
+      // Check for profit-taking signals
+      if (fastKPrev < 80 && fastK >= 80 && document.getElementById('bull-condition-5').querySelector('input').checked) {
+        addAlert("Take partial profits - Fast stochastic crossed above 80", "bullish");
+      }
+      
+      if (fastKPrev > 20 && fastK <= 20 && document.getElementById('bear-condition-5').querySelector('input').checked) {
+        addAlert("Take partial profits - Fast stochastic crossed below 20", "bearish");
+      }
+      
+      // Check for pullback setup
+      checkPullbackSetup();
+    }
+
+    function loadData(timeframe) {
+      const apiTimeframe = timeframe;
+      // Adjust limit based on timeframe to show a reasonable time period
+      const limit = timeframe === '1m' || timeframe === '5m' ? 500 : 300;
+
+      fetch(`https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=${apiTimeframe}&limit=${limit}`)
+        .then(res => res.json())
+        .then(data => {
+          currentCandles = data.map(d => ({
+            time: d[0] / 1000,
+            open: parseFloat(d[1]),
+            high: parseFloat(d[2]),
+            low: parseFloat(d[3]),
+            close: parseFloat(d[4]),
+          }));
+
+          candleSeries.setData(currentCandles);
+          
+          // Calculate and set EMAs if they're toggled on
+          Object.keys(emaSeries).forEach(period => {
+            const btn = document.querySelector(`.toggle-btn[data-ema="${period}"]`);
+            if (btn && btn.classList.contains('active')) {
+              if (!emaSeries[period]) {
+                emaSeries[period] = chart.addLineSeries({
+                  color: getEMAColor(period),
+                  lineWidth: 1,
+                  title: `${period} EMA`,
+                });
+              }
+              const emaData = calculateEMA(currentCandles, parseInt(period));
+              emaSeries[period].setData(emaData);
+            } else if (emaSeries[period]) {
+              // Remove the EMA series if it exists but is toggled off
+              chart.removeSeries(emaSeries[period]);
+              emaSeries[period] = null;
+            }
+          });
+
+          // Calculate all stochastic variations
+          currentStochastics.fast = calculateStochastic(currentCandles, 9, 3);
+          currentStochastics.medium = calculateStochastic(currentCandles, 14, 3);
+          currentStochastics.slow = calculateStochastic(currentCandles, 40, 4);
+          currentStochastics.full = calculateStochastic(currentCandles, 60, 10, 10);
+          
+          // Filter out null values and set data for each stochastic series
+          stochSeries['fast-9-3-d'].setData(currentStochastics.fast.filter(d => d.d !== null).map(d => ({ time: d.time, value: d.d })));
+          stochSeries['fast-14-3-d'].setData(currentStochastics.medium.filter(d => d.d !== null).map(d => ({ time: d.time, value: d.d })));
+          stochSeries['fast-40-4-d'].setData(currentStochastics.slow.filter(d => d.d !== null).map(d => ({ time: d.time, value: d.d })));
+          stochSeries['full-60-10-10-d'].setData(currentStochastics.full.filter(d => d.d !== null).map(d => ({ time: d.time, value: d.d })));
+
+          console.log(`Chart data updated for ${currentSymbol} ${timeframe}`);
+          updateStochasticLegend();
+          checkSetupConditions();
+        })
+        .catch(err => {
+          console.error(`Error loading data for ${currentSymbol} ${timeframe}:`, err);
+        });
+    }
+    
+    function setupIndicatorControls() {
+      // Stochastic toggles
+      document.getElementById('stoch-fast-9-3').addEventListener('change', function() {
+        const isChecked = this.checked;
+        stochSeries['fast-9-3-d'].applyOptions({ visible: isChecked });
+        updateStochasticLegend();
+      });
+      
+      document.getElementById('stoch-fast-14-3').addEventListener('change', function() {
+        const isChecked = this.checked;
+        stochSeries['fast-14-3-d'].applyOptions({ visible: isChecked });
+        updateStochasticLegend();
+      });
+      
+      document.getElementById('stoch-fast-40-4').addEventListener('change', function() {
+        const isChecked = this.checked;
+        stochSeries['fast-40-4-d'].applyOptions({ visible: isChecked });
+        updateStochasticLegend();
+      });
+      
+      document.getElementById('stoch-full-60-10-10').addEventListener('change', function() {
+        const isChecked = this.checked;
+        stochSeries['full-60-10-10-d'].applyOptions({ visible: isChecked });
+        updateStochasticLegend();
+      });
+      
+      // EMA toggles
+      document.querySelectorAll('.toggle-btn[data-ema]').forEach(btn => {
+        btn.addEventListener('click', function() {
+          this.classList.toggle('active');
+          loadData(currentTimeframe); // Reload data to update EMAs
+        });
+      });
+    }
+    
+    function getEMAColor(period) {
+      const colors = {
+        '20': '#FF6D00',
+        '50': '#2962FF',
+        '100': '#00C805',
+        '200': '#9900FF'
+      };
+      return colors[period] || '#333';
+    }
+
+    function setupAutoUpdate(timeframe) {
+      // Clear any existing interval
+      if (updateInterval) {
+        clearInterval(updateInterval);
+      }
+      
+      // Set update frequency based on timeframe
+      let updateFrequency;
+      switch(timeframe) {
+        case '1m':
+          updateFrequency = 30000; // 30 seconds for 1m charts
+          break;
+        case '5m':
+          updateFrequency = 60000; // 1 minute for 5m charts
+          break;
+        case '15m':
+          updateFrequency = 300000; // 5 minutes for 15m charts
+          break;
+        case '1h':
+          updateFrequency = 600000; // 10 minutes for 1h charts
+          break;
+        case '4h':
+          updateFrequency = 1800000; // 30 minutes for 4h charts
+          break;
+        case '1d':
+          updateFrequency = 3600000; // 1 hour for daily charts
+          break;
+        default:
+          updateFrequency = 60000; // default to 1 minute
+      }
+      
+      updateInterval = setInterval(() => {
+        loadData(timeframe);
+      }, updateFrequency);
+    }
+
+    document.querySelectorAll('.timeframe-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        currentTimeframe = this.dataset.tf;
+        initChart();
+      });
+    });
+
+    // Handle crypto selector change
+    document.getElementById('crypto-selector').addEventListener('change', function() {
+      currentSymbol = this.value;
+      initChart();
+    });
+
+    // Handle window resize
+    window.addEventListener('resize', function() {
+      if (chart) {
+        chart.applyOptions({ 
+          width: document.getElementById('chart-container').clientWidth,
+          height: document.getElementById('chart-container').clientHeight
+        });
+      }
+      if (stochasticChart) {
+        stochasticChart.applyOptions({ 
+          width: document.getElementById('stochastic-container').clientWidth,
+          height: document.getElementById('stochastic-container').clientHeight
+        });
+      }
+    });
+
+    initChart();
+  </script>
+</body>
+</html>
